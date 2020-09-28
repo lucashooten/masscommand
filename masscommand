@@ -1,0 +1,80 @@
+#!/bin/python3.6
+# -*- coding: utf-8 -*-
+# author: Lucas M Hooten
+# date: 9/28/2020
+
+"""
+Used to quickly execute a single command across all ansible-accessible servers, with choice to differentiate by box type.
+
+Requires password for sudoer/root user
+Requires updated Ansible hosts file 
+"""
+
+import argparse, sys
+import yaml # for hosts file parsing
+import subprocess # executing ssh without paramiko
+import inquirer # 3rd party interaction tool for picking options from list, could be replaced with argparse
+import getpass # securely receiving password as input
+
+parser=argparse.ArgumentParser(description='''Quickly execute commands across all client boxes, with option to specify box type''')
+parser.add_argument('hosts', type=str, help='Current ansible hosts file')
+parser.add_argument('--timeout', default="10", help='time in seconds allowed for command to execute on each device before skipping (default: 10)')
+args = parser.parse_args()
+
+boxtypes = { # nested dictionary for inquirer to parse through
+	'a' : ['_a'],
+	'b' : ['_b'],
+	'c' : ['_c'],
+	'd' : ['_d'],
+	'e' : ['_e','_e2','_e3'],
+	'f' : ['_f', '_f2'],
+	'g' : ['_g'],
+	'all' : ['_a', '_b', '_c', '_d', '_e', '_f', '_g', '_e2', '_e3', '_f2']
+}
+
+box = [ #question list for inquirer
+	inquirer.List('box',
+	message="Which box type do you want to target?",
+	choices=['a', 'b', 'c', 'd', 'e', 'f', 'g', 'all'],
+	),
+]
+
+def ssh_ansible_hosts(sshPass, hosts_file, box_type, command):
+	print('\n----------------------------------------------')
+	print('Executing [[ '+command+' ]] on '+box_type+' boxes. Timeout set to '+args.timeout+' seconds per host.')
+	print('----------------------------------------------\n')
+	command = "'"+command+"'" # adds quotes to command, so it can be parsed in subprocess
+	box_type = boxtypes[box_type] # this takes user input and matches it to nested dictionary
+	with open(hosts_file,'r') as hostsFile: # yaml parsing of hosts below
+		hostsFile = yaml.load(hostsFile, Loader=yaml.SafeLoader)
+		children = hostsFile['all']['children']
+		for category in children:
+			#print(category)
+			hosts = yaml.load(str(hostsFile['all']['children'][category]['hosts']), Loader=yaml.SafeLoader)
+			for host in hosts:
+				if not any(i in host for i in box_type): # matches nested dictionary results to YAML file name endings (ie '_a')
+					continue
+				hostname =  hostsFile['all']['children'][category]['hosts'][host]['name']
+				IP = hostsFile['all']['children'][category]['hosts'][host]['ansible_host']
+				print(category+' | '+hostname+'('+host+')'+': '+IP)
+				try: 
+					subprocess.run(("sshpass -p '{2}' ssh root@{0} {1}").format(IP, command, sshPass), # one-liner command to run on CA mgmt server.
+					shell=True, 
+					timeout=int(args.timeout)) # timeout for command to execute. Default is 10, can be overridden with --timeout option
+
+				except Exception as e:
+					# print(e) # only uncomment for troubleshooting, this will reveal sshpass in result otherwise
+					print('Process exceeded timeout or other error occured (maybe bad IP?), continuing...             [  FAILED  ]')
+					print('\n')
+					continue
+				print('\n')
+
+if __name__ == "__main__":
+	ssh_ansible_hosts(
+	sshPass=getpass.getpass('Enter sudoer/root password: '), # if using anything other than root, sudo w/out password must be enabled for user, and replace user on subprocess line. 
+	hosts_file=args.hosts, 
+	box_type=str(inquirer.prompt(box))[9:-2], 
+	command=input('What command would you like to execute?: ')
+	)
+else:
+	pass

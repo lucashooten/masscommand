@@ -1,0 +1,44 @@
+#Ansible Host File
+
+# Masscommand uses standard Ansible hosts file structure to operate
+# Make sure your categories line up with host titles in this file. 
+# Ex, default masscommand file uses a,b,c,d,e,e2... etc,
+# meaning it checks for "_a" "_b" "_c" and so on in each title. 
+
+# You may want to adjust this to something more useful, like "_DC", "_FileServer", etc
+# If you do rename your boxes to match this schema, then make sure to adjust categories in the masscommand file
+
+all:
+  hosts:
+  children:
+
+    Windows:
+      hosts:
+        Win_a:
+          name: Win-DC-001
+          ansible_host: 10.11.0.10
+        Win_e:
+          name: Win-DHCP-03
+          ansible_host: 10.11.0.22
+        Win_e2:
+          name: Win-IIS-002
+          ansible_host: 10.15.99.221
+        Win_e3:
+          name: Win-BAK-002
+          ansible_host: 192.168.0.19
+
+    Linux:
+      hosts:
+        Linux_a:
+          name: Lin-DC-001
+          ansible_host: 10.10.0.50
+        Linux_e:
+          name: Lin-DHCP-002
+          ansible_host: 10.30.30.5
+        Linux_f2:
+          name: Lin-SCAN-002
+          ansible_host: 172.21.0.99
+        Linux_d:
+          name: Lin-DNS-001
+          ansible_host: 192.168.33.33
+
